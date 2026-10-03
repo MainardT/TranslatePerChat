@@ -1,0 +1,1307 @@
+.vc-trans-accessory {
+    color: var(--text-muted);
+    margin-top: 0.5em;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.2rem;
+    white-space: break-spaces;
+}
+
+.vc-trans-accessory-icon {
+    margin-right: 0.25em;
+}
+
+.vc-trans-dismiss {
+    all: unset;
+    cursor: pointer;
+    color: var(--text-link);
+}
+
+.vc-trans-dismiss:is(:hover, :focus) {
+    text-decoration: underline;
+}
+
+.vc-trans-auto-translate {
+    color: var(--green-360);
+}
+
+.vc-trans-chat-button {
+    scale: 1.085;
+}
+/* Translate button at the start of each message */
+.vc-trans-gutter {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.1s ease;
+}
+
+[id^="chat-messages-"]:hover .vc-trans-gutter,
+[id^="chat-messages-"]:focus-within .vc-trans-gutter {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.vc-trans-gutter-button {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    cursor: pointer;
+    /* same colour as the message time; the script fills in the exact value for the current theme */
+    color: var(--vc-trans-time-color, var(--text-muted));
+}
+
+.vc-trans-gutter-button:hover:not(:disabled),
+.vc-trans-gutter-button:focus-visible {
+    /* the message-time grey moved about a third of the way towards the main text colour: light grey in dark themes,
+       darker in light themes, so it follows the theme like the reply line above the avatar does */
+    color: color-mix(in srgb, var(--vc-trans-time-color, var(--text-muted)) 63%, var(--text-default, var(--text-normal, var(--header-primary, #fff))) 37%);
+    background: var(--background-modifier-hover);
+}
+
+.vc-trans-gutter-button:disabled {
+    cursor: progress;
+    opacity: 0.5;
+}
+
+/* a file that was already translated: the button is lit, a click opens the stored translation */
+.vc-trans-gutter-button-ready,
+.vc-trans-gutter-button-ready:hover:not(:disabled) {
+    color: var(--brand-500, #5865f2);
+}
+
+/* a file that is too large to translate: same slot, but permanently disabled */
+.vc-trans-gutter-button-unavailable:disabled {
+    cursor: not-allowed;
+    opacity: 0.35;
+}
+
+/* the window that shows a translated file */
+.vc-trans-file-modal-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Small window that opens above the chat button */
+.vc-trans-button-anchor {
+    display: flex;
+    align-items: center;
+}
+
+.vc-trans-popout {
+    box-sizing: border-box;
+    width: 360px;
+    padding: 16px;
+    overflow-y: auto;
+    /* room for the scroll bar is always kept, so nothing moves sideways when it appears */
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-high);
+    color: var(--text-default, var(--text-normal));
+}
+
+.vc-trans-popout-title {
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--header-primary);
+}
+
+/* "Bold" effect for the message translate button: an outline of the same colour around the strokes.
+   The icon is drawn on a 960-unit canvas shown at 16px, so 1px on screen is 60 units. */
+.vc-trans-gutter-button svg path {
+    stroke: currentColor;
+    stroke-width: calc(var(--vc-trans-bold, 0) * 60);
+    stroke-linejoin: round;
+}
+
+/* short explanation under a window title (pulls up into the title's bottom margin) */
+.vc-trans-popout-desc {
+    margin: -8px 0 4px;
+    font-size: 14px;
+    line-height: 18px;
+    color: var(--text-muted);
+}
+
+.vc-trans-menu {
+    margin: 12px 0 16px;
+}
+
+/* the last menu of the window: the window's own padding is enough below it */
+.vc-trans-menu:last-child {
+    margin-bottom: 0;
+}
+
+.vc-trans-divider {
+    margin-bottom: 16px;
+}
+
+/* when the language menu above is hidden, the line would otherwise touch the switch */
+.vc-trans-divider-after-switch {
+    margin-top: 12px;
+}
+
+/* ---- translate a piece of the screen ---- */
+.vc-trans-screen-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    cursor: crosshair;
+    user-select: none;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+/* while dragging, only the outside of the frame is dimmed */
+.vc-trans-screen-overlay-selecting {
+    background: transparent;
+}
+
+.vc-trans-screen-box {
+    position: absolute;
+    border: 1.5px solid var(--brand-500, #5865f2);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+}
+
+.vc-trans-screen-hint {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    color: var(--header-primary);
+    background: var(--background-floating);
+    box-shadow: var(--elevation-high);
+    pointer-events: none;
+}
+
+/* outline is drawn outside of the area so it never ends up in the picture that is read */
+.vc-trans-screen-frame {
+    position: fixed;
+    z-index: 99999;
+    outline: 2px dashed var(--brand-500, #5865f2);
+    outline-offset: 2px;
+    pointer-events: none;
+}
+
+.vc-trans-screen-bubble {
+    position: fixed;
+    z-index: 99999;
+    box-sizing: border-box;
+    min-width: 120px;
+    max-width: min(420px, calc(100vw - 16px));
+    max-height: 60vh;
+    overflow: auto;
+    padding: 10px 34px 10px 12px;
+    border-radius: 8px;
+    font-size: 15px;
+    line-height: 20px;
+    color: var(--header-primary);
+    background: var(--background-floating);
+    box-shadow: var(--elevation-high);
+}
+
+.vc-trans-screen-bubble-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
+    cursor: text;
+}
+
+.vc-trans-screen-bubble-loading .vc-trans-screen-bubble-text {
+    color: var(--text-muted);
+    user-select: none;
+    cursor: default;
+}
+
+.vc-trans-screen-bubble-close {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    font-size: 18px;
+    line-height: 20px;
+    color: var(--text-muted);
+    background: transparent;
+    cursor: pointer;
+}
+
+.vc-trans-screen-bubble-close:hover {
+    color: var(--header-primary);
+    background: var(--background-modifier-hover);
+}
+
+/* translation shown on top of the original */
+.vc-trans-screen-result {
+    position: fixed;
+    z-index: 99999;
+    cursor: pointer;
+    outline: 2px dashed var(--brand-500, #5865f2);
+    outline-offset: 2px;
+}
+
+.vc-trans-screen-patch {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 2px 4px;
+    border-radius: 4px;
+    overflow: hidden;
+    line-height: 1.15;
+    word-break: normal;
+    overflow-wrap: normal;
+    color: #fff;
+    background: rgba(10, 10, 12, 0.96);
+}
+
+.vc-trans-screen-patch-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* second click: show what is under the translation */
+.vc-trans-screen-result-original .vc-trans-screen-patch {
+    opacity: 0;
+}
+
+.vc-trans-screen-result-close {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 1;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 18px;
+    color: #fff;
+    background: rgba(10, 10, 12, 0.96);
+    cursor: pointer;
+}
+
+/* message in the middle of the selected frame */
+.vc-trans-screen-notice {
+    position: fixed;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: 2px dashed var(--brand-500, #5865f2);
+    outline-offset: 2px;
+    pointer-events: none;
+}
+
+.vc-trans-screen-notice-text {
+    box-sizing: border-box;
+    max-width: calc(100% - 16px);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 15px;
+    line-height: 20px;
+    text-align: center;
+    color: #fff;
+    background: rgba(10, 10, 12, 0.96);
+}
+
+/* text swapped for its translation right where it was: a thin bar on the left marks it */
+/* translated text: no mark of its own (the message buttons and the panel in the corner show it) */
+.vc-trans-replaced {
+    cursor: pointer;
+}
+
+/* switched back to the original: the bar stays, but faint */
+
+/* small panel in the corner of the chat while there is swapped (translated) text.
+   Its backing is the colour a message gets under the mouse, laid over the chat background so it is solid:
+   Discord itself picks that colour to stand out in every theme */
+.vc-trans-replace-panel {
+    width: max-content;
+    white-space: nowrap;
+    --vc-trans-panel-hover: var(--background-message-hover, var(--message-background-hover, var(--background-modifier-hover)));
+    position: fixed;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 1px 4px 1px 10px;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 7px;
+    font-size: 13px;
+    line-height: 16px;
+    color: var(--text-default, var(--text-normal));
+    background:
+        linear-gradient(var(--vc-trans-panel-hover), var(--vc-trans-panel-hover)),
+        var(--background-primary, var(--background-base-lower, var(--bg-base-primary)));
+    box-shadow: var(--elevation-high);
+    transition: opacity 0.3s;
+}
+
+/* a second after the mouse leaves: see-through */
+.vc-trans-replace-panel-faded {
+    opacity: 0.4;
+}
+
+.vc-trans-replace-panel-count {
+    margin-right: 2px;
+    color: var(--text-muted);
+}
+
+.vc-trans-replace-panel-button,
+.vc-trans-replace-panel-close {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 2px 8px;
+    border: none;
+    border-radius: 5px;
+    line-height: 16px;
+    font-size: 13px;
+    color: var(--header-primary);
+    background: var(--background-modifier-hover);
+    cursor: pointer;
+}
+
+.vc-trans-replace-panel-close {
+    padding: 2px 6px;
+    background: transparent;
+}
+
+.vc-trans-replace-panel-button:hover,
+.vc-trans-replace-panel-close:hover {
+    background: var(--background-modifier-active, var(--background-modifier-hover));
+}
+
+/* the shortcut written small next to the button's name */
+.vc-trans-replace-panel-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+/* keyboard sign with the list of all shortcuts above it on hover */
+.vc-trans-replace-panel-keys {
+    position: relative;
+    padding: 0 6px;
+    font-size: 15px;
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.vc-trans-replace-panel-keys:hover {
+    color: var(--header-primary);
+}
+
+.vc-trans-replace-panel-sheet {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 4px);
+    display: none;
+    grid-template-columns: auto auto;
+    gap: 4px 14px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    white-space: nowrap;
+    color: var(--text-default, var(--text-normal));
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-high);
+}
+
+.vc-trans-replace-panel-keys-open .vc-trans-replace-panel-sheet {
+    display: grid;
+}
+
+/* a bridge over the gap between the sign and the list, so the list does not close on the way to it */
+.vc-trans-replace-panel-sheet::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 10px;
+}
+
+.vc-trans-replace-panel-sheet-title {
+    grid-column: 1 / -1;
+    font-weight: 600;
+    color: var(--header-primary);
+}
+
+.vc-trans-replace-panel-sheet-line {
+    grid-column: 1 / -1;
+    height: 1px;
+    background: var(--border-subtle, var(--background-modifier-accent));
+}
+
+.vc-trans-replace-panel-sheet-button {
+    grid-column: 1 / -1;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--header-primary);
+    background: var(--background-modifier-hover);
+    cursor: pointer;
+}
+
+.vc-trans-replace-panel-sheet-button:hover {
+    background: var(--background-modifier-active, var(--background-modifier-hover));
+}
+
+.vc-trans-replace-panel-sheet-key {
+    font-weight: 600;
+    color: var(--header-primary);
+}
+
+/* plates with buttons next to a message (shown while the message is hovered), look like Discord's own message toolbar */
+.vc-trans-plate-anchor {
+    height: 0;
+}
+
+.vc-trans-plate-holder {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+[id^="chat-messages-"]:hover .vc-trans-plate-holder,
+[id^="chat-messages-"]:has(:focus-visible) .vc-trans-plate-holder {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* the mouse is on the other side of the text: this plate stays hidden */
+[id^="chat-messages-"] .vc-trans-plate-off.vc-trans-plate-holder {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.vc-trans-plate {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    box-sizing: border-box;
+    padding: 2px;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 6px;
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-low, 0 1px 3px rgba(0, 0, 0, 0.3));
+}
+
+/* the message time, written under the plate that took its place */
+.vc-trans-plate-time {
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 13px;
+    white-space: nowrap;
+    color: var(--text-muted);
+}
+
+.vc-trans-plate-button {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 20px;
+    border-radius: 4px;
+    color: var(--interactive-normal, var(--text-muted));
+    cursor: pointer;
+}
+
+.vc-trans-plate-button:hover:not(:disabled) {
+    color: var(--interactive-hover, var(--header-primary));
+    background: var(--background-modifier-hover);
+}
+
+.vc-trans-plate-button:disabled {
+    cursor: progress;
+    opacity: 0.5;
+}
+
+/* the message is translated: the translate button is lit */
+.vc-trans-plate-button-active {
+    color: var(--brand-500, #5865f2);
+}
+
+/* tip under the mouse over translated text */
+.vc-trans-replaced-tip {
+    position: fixed;
+    z-index: 1001;
+    max-width: 360px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-default, var(--text-normal));
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-high);
+    pointer-events: none;
+}
+
+.vc-trans-replaced-tip-off {
+    margin-top: 4px;
+    font-size: 11px;
+    line-height: 14px;
+    color: var(--text-muted);
+}
+
+/* the button on a picture in the chat (shown while the mouse is on the picture) */
+.vc-trans-image-plate {
+    position: fixed;
+    /* above Discord's large picture view (and on the same level as the translation patches) */
+    z-index: 100000;
+}
+
+/* in the large view: a solid plate with a light outline and a shadow, seen on any background */
+.vc-trans-image-plate-large .vc-trans-plate {
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgb(24, 25, 28);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.vc-trans-image-plate-large .vc-trans-plate-button:not(.vc-trans-plate-button-active) {
+    color: rgb(230, 231, 235);
+}
+
+/* our own language list with search (in the small window of the chat button) */
+.vc-trans-lang-field {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 8px;
+    font-size: 15px;
+    color: var(--text-default, var(--text-normal));
+    background: var(--input-background, var(--background-secondary));
+    outline: none;
+}
+
+.vc-trans-lang-current {
+    cursor: pointer;
+    text-align: left;
+}
+
+.vc-trans-lang-current:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.vc-trans-lang-open .vc-trans-lang-field {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-trans-lang-arrow {
+    color: var(--interactive-normal, var(--text-muted));
+}
+
+.vc-trans-lang {
+    position: relative;
+}
+
+/* the list floats over the settings below (or above, when there is no room below) */
+.vc-trans-lang-list {
+    position: absolute;
+    z-index: 10;
+    left: 0;
+    right: 0;
+    top: calc(100% + 4px);
+    box-shadow: var(--elevation-high, 0 4px 12px rgba(0, 0, 0, 0.4));
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-base-lower));
+}
+
+.vc-trans-lang-option {
+    padding: 8px 12px;
+    font-size: 14px;
+    color: var(--text-default, var(--text-normal));
+    cursor: pointer;
+}
+
+.vc-trans-lang-option:hover {
+    background: var(--background-modifier-hover);
+}
+
+.vc-trans-lang-option-selected {
+    font-weight: 600;
+    color: var(--brand-500, #5865f2);
+}
+
+.vc-trans-lang-empty {
+    padding: 8px 12px;
+    color: var(--text-muted);
+}
+
+/* ---------- animation of translated messages ---------- */
+
+/* the text blurs away before the swap and comes back out of the blur after it */
+.vc-trans-replaced {
+    transition: filter var(--vc-trans-swap-ms, 140ms) ease, opacity var(--vc-trans-swap-ms, 140ms) ease;
+}
+
+.vc-trans-swap-out {
+    filter: blur(6px);
+    opacity: 0.4;
+}
+
+/* ---------- descriptions in the chat button's window: two lines, open in full on a click ---------- */
+
+.vc-trans-desc {
+    position: relative;
+}
+
+.vc-trans-desc-clickable {
+    cursor: pointer;
+}
+
+.vc-trans-desc-text {
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 18px;
+    transition: max-height 0.2s ease;
+}
+
+/* closed: the second line fades out, the "more" button sits in the faded part */
+.vc-trans-desc-closed .vc-trans-desc-text {
+    -webkit-mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 45%, transparent 100%);
+}
+
+.vc-trans-desc-more {
+    display: inline-block;
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 14px;
+    color: var(--text-link, var(--brand-500, #5865f2));
+    user-select: none;
+}
+
+.vc-trans-desc-closed .vc-trans-desc-more {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding-left: 24px;
+    background: linear-gradient(to right, transparent, var(--background-floating, var(--background-base-lower)) 40%);
+}
+
+.vc-trans-desc-clickable:hover .vc-trans-desc-more {
+    text-decoration: underline;
+}
+
+/* ---------- the chat button's window (short) and the full settings ---------- */
+
+.vc-trans-lang-up .vc-trans-lang-list {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
+
+.vc-trans-popout-head {
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 24px;
+    color: var(--header-primary);
+}
+
+/* air between the settings: after the description, not between the name and its description */
+.vc-trans-popout .vc-form-switch-wrapper,
+.vc-trans-settings .vc-form-switch-wrapper {
+    display: block;
+    margin-bottom: 16px;
+}
+
+.vc-trans-popout .vc-form-switch-text,
+.vc-trans-settings .vc-form-switch-text {
+    gap: 2px;
+}
+
+.vc-trans-popout-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.vc-trans-popout-actions > * {
+    flex: 1;
+}
+
+/* captions of the groups in the chat window: air below them; the second one has a line above */
+.vc-trans-popout .vc-trans-group-title {
+    margin: 4px 0 12px;
+}
+
+.vc-trans-popout .vc-trans-group-title-line {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-subtle, var(--background-modifier-accent));
+}
+
+.vc-trans-popout-footer {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle, var(--background-modifier-accent));
+}
+
+.vc-trans-popout-footer > * {
+    width: 100%;
+}
+
+.vc-trans-field-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--header-secondary, var(--text-muted));
+}
+
+.vc-trans-settings {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-bottom: 16px;
+}
+
+.vc-trans-settings .vc-trans-menu {
+    margin: 4px 0 8px;
+}
+
+.vc-trans-section {
+    margin: 20px 0 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle, var(--background-modifier-accent));
+}
+
+/* only the very first heading of the settings has no space above it */
+.vc-trans-settings > .vc-trans-section:first-child {
+    margin-top: 0;
+}
+
+.vc-trans-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--header-primary);
+}
+
+.vc-trans-section-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.vc-trans-group-title {
+    margin: 10px 0 2px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--header-secondary, var(--text-muted));
+}
+
+.vc-trans-row {
+    margin: 6px 0 10px;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.vc-trans-row-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.vc-trans-row-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--header-primary);
+}
+
+.vc-trans-row-value {
+    white-space: nowrap;
+    color: var(--header-primary);
+}
+
+.vc-trans-range {
+    width: 100%;
+    accent-color: var(--brand-500, #5865f2);
+}
+
+.vc-trans-number {
+    width: 64px;
+    padding: 4px 6px;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--header-primary);
+    background: var(--input-background, var(--background-secondary));
+}
+
+.vc-trans-text-field {
+    color: var(--header-primary);
+    background: var(--input-background, var(--background-secondary));
+}
+
+.vc-trans-segments {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.vc-trans-segment {
+    flex: 1;
+    padding: 6px 4px;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--header-primary);
+    background: transparent;
+    cursor: pointer;
+}
+
+.vc-trans-segment-on {
+    border-color: var(--brand-500, #5865f2);
+    background: color-mix(in srgb, var(--brand-500, #5865f2) 25%, transparent);
+}
+
+/* labels at the start of the panel in the corner: "Auto", "EN → RU" */
+.vc-trans-replace-panel-labels {
+    display: flex;
+    gap: 4px;
+}
+
+.vc-trans-replace-panel-labels:empty {
+    display: none;
+}
+
+.vc-trans-replace-panel-label {
+    padding: 1px 6px;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--header-primary);
+    background: color-mix(in srgb, var(--brand-500, #5865f2) 30%, transparent);
+    cursor: pointer;
+}
+
+.vc-trans-replace-panel-label:hover {
+    background: color-mix(in srgb, var(--brand-500, #5865f2) 50%, transparent);
+}
+
+/* narrow chat: the panel gives up parts step by step */
+.vc-trans-replace-panel-c1 .vc-trans-replace-panel-count {
+    display: none;
+}
+
+/* a label with nothing to click (pause, no connection) */
+.vc-trans-replace-panel-label-plain,
+.vc-trans-replace-panel-label-plain:hover {
+    cursor: default;
+    background: color-mix(in srgb, var(--brand-500, #5865f2) 30%, transparent);
+}
+
+/* a chat that translates itself: no reset (the cross, its shortcut and its line in the shortcut list are hidden) */
+.vc-trans-replace-panel-noreset .vc-trans-replace-panel-close,
+.vc-trans-replace-panel-noreset .vc-trans-replace-panel-sheet-reset {
+    display: none;
+}
+
+/* our buttons at the right end of the "you cannot send messages here" bar */
+.vc-trans-ro-host {
+    position: fixed;
+    z-index: 100;
+    transform: translateY(-50%);
+}
+
+.vc-trans-ro-bar {
+    position: relative;
+    display: flex;
+    gap: 4px;
+}
+
+.vc-trans-ro-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    color: var(--interactive-normal, var(--text-muted));
+    background: transparent;
+    cursor: pointer;
+}
+
+.vc-trans-ro-button:hover {
+    color: var(--interactive-hover, var(--header-primary));
+    background: var(--background-modifier-hover);
+}
+
+.vc-trans-ro-popout {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 12px);
+}
+
+/* the panel steps aside while the chat window is open */
+.vc-trans-replace-panel-away {
+    display: none !important;
+}
+
+/* ---------- notices: one look for all of them ---------- */
+.vc-trans-notice,
+.vc-trans-screen-notice-text {
+    max-width: 320px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 18px;
+    color: var(--text-default, var(--text-normal));
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-high, 0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.vc-trans-notice {
+    position: fixed;
+    z-index: 100002;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+/* coloured dot: green = done, red = error */
+.vc-trans-notice-success::before,
+.vc-trans-notice-error::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin: 0 8px 1px 0;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.vc-trans-notice-success::before {
+    background: var(--status-positive, #23a55a);
+}
+
+.vc-trans-notice-error::before {
+    background: var(--status-danger, #f23f43);
+}
+
+.vc-trans-notice-gone {
+    opacity: 0;
+}
+
+/* the stack of notices above the panel in the corner: the newest on top, all lined up on the right */
+.vc-trans-notices {
+    position: fixed;
+    z-index: 1001;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: flex-end;
+    gap: 4px;
+    pointer-events: none;
+}
+
+.vc-trans-notices-item {
+    max-width: 320px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+    border-radius: 7px;
+    font-size: 13px;
+    line-height: 17px;
+    color: var(--text-default, var(--text-normal));
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-high);
+}
+
+.vc-trans-notices-item-success::before,
+.vc-trans-notices-item-error::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin: 0 8px 1px 0;
+    border-radius: 50%;
+    vertical-align: middle;
+}
+
+.vc-trans-notices-item-success::before {
+    background: var(--status-positive, #23a55a);
+}
+
+.vc-trans-notices-item-error::before {
+    background: var(--status-danger, #f23f43);
+}
+
+/* our own button tips (the buttons of pictures), drawn like Discord's */
+.vc-trans-tip {
+    position: fixed;
+    z-index: 100003;
+    max-width: 260px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 18px;
+    color: var(--text-default, var(--text-normal));
+    background: var(--background-floating, var(--background-base-lower));
+    box-shadow: var(--elevation-high, 0 4px 12px rgba(0, 0, 0, 0.4));
+    pointer-events: none;
+}
+
+/* on a picture: no dashed frame (the status and the notices sit in its middle) */
+.vc-trans-screen-frame-plain,
+.vc-trans-screen-notice-plain {
+    outline: none;
+}
+
+/* while the screen is photographed for reading: our own things are hidden for that moment */
+.vc-trans-capturing [data-vc-screen-translate] {
+    visibility: hidden !important;
+}
+
+/* ---------- notices on pictures: big and seen on any picture ---------- */
+.vc-trans-screen-bubble-picture,
+.vc-trans-screen-notice-plain .vc-trans-screen-notice-text {
+    padding: 14px 48px 14px 18px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    border-radius: 12px;
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 30px;
+    color: rgb(240, 241, 245);
+    background: rgb(24, 25, 28);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.7), 0 4px 24px rgba(0, 0, 0, 0.75);
+}
+
+.vc-trans-screen-notice-plain .vc-trans-screen-notice-text {
+    max-width: 90%;
+    padding: 14px 18px;
+    text-align: center;
+}
+
+.vc-trans-screen-bubble-picture .vc-trans-screen-bubble-close {
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    font-size: 26px;
+    line-height: 28px;
+    color: rgb(200, 202, 208);
+}
+
+/* the status window had no plate of its own in newer Discord: a fixed one */
+.vc-trans-screen-bubble {
+    background: var(--background-floating, var(--background-base-lower, rgb(35, 36, 40)));
+}
+
+.vc-trans-screen-result-picture {
+    outline: none;
+}
+
+
+/* the translation box under the edit field of a message */
+.vc-trans-twin {
+    margin: 8px 0 4px;
+}
+
+.vc-trans-twin-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.vc-trans-twin-again {
+    all: unset;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-link, #00a8fc);
+}
+
+.vc-trans-twin-again:hover {
+    text-decoration: underline;
+}
+
+.vc-trans-twin-area {
+    box-sizing: border-box;
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    max-height: 50vh;
+    padding: 11px 16px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+    resize: none;
+    font: inherit;
+    font-size: 1rem;
+    line-height: 1.375rem;
+    color: var(--text-normal, var(--text-default));
+    background: var(--channeltextarea-background, var(--background-base-lower, rgba(0, 0, 0, 0.2)));
+}
+
+.vc-trans-twin-busy .vc-trans-twin-area {
+    opacity: 0.6;
+}
+
+/* caption above the edit field */
+.vc-trans-twin-caption {
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* our "esc / enter" line under the translation box */
+.vc-trans-twin-hint {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+}
+
+.vc-trans-twin-link {
+    cursor: pointer;
+    color: var(--text-link, #00a8fc);
+}
+
+.vc-trans-twin-link:hover {
+    text-decoration: underline;
+}
+
+/* the divisions under a slider: one per step, the minimum on the left and the maximum on the right */
+.vc-trans-range-ticks {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 7px;
+    margin-top: 2px;
+}
+
+.vc-trans-tick,
+.vc-trans-tick-on {
+    width: 2px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--text-muted);
+    opacity: 0.6;
+}
+
+.vc-trans-tick-on {
+    height: 9px;
+    opacity: 1;
+    background: var(--brand-500, #5865f2);
+}
+
+.vc-trans-range-ends {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* full settings: the hint on top and the shortcuts */
+.vc-trans-settings-hint {
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+}
+
+.vc-trans-hotkey-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vc-trans-hotkey-text {
+    flex: 1;
+    font-size: 14px;
+    line-height: 18px;
+}
+
+.vc-trans-hotkey-keys {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    font-weight: 600;
+    color: var(--header-secondary, var(--text-muted));
+}
+
+.vc-trans-hotkey-key {
+    all: unset;
+    box-sizing: border-box;
+    min-width: 34px;
+    padding: 4px 10px;
+    text-align: center;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--text-default, var(--text-normal));
+    background: var(--background-modifier-hover);
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent));
+}
+
+.vc-trans-hotkey-key:hover,
+.vc-trans-hotkey-key:focus-visible {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-trans-hotkey-key-wait {
+    color: var(--brand-500, #5865f2);
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-trans-hotkey-note {
+    margin: 4px 0 12px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+}
+
+.vc-trans-hotkey-warning {
+    margin-bottom: 12px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-danger, #f23f42);
+}
