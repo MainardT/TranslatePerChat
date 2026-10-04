@@ -1,5 +1,7 @@
 # TranslatePerChat — «Переводчик чатов» for Vencord
 
+> **[Installation guide for beginners — step by step](GUIDE.md)** · **[Подробный гайд по установке для новичков — шаг за шагом](GUIDE.md)**
+
 Personal Vencord userplugin: translation that is set up **per chat**, with a translate button on every message. Based on Vencord's built-in Translate plugin (turn that one off).
 
 Личный плагин Vencord: перевод, который настраивается **отдельно для каждого чата**, и кнопка перевода у каждого сообщения. Основан на встроенном плагине Translate (его нужно отключить).
@@ -31,13 +33,23 @@ Personal Vencord userplugin: translation that is set up **per chat**, with a tra
 3. Download and unpack [Vencord](https://github.com/Vendicated/Vencord/archive/refs/heads/main.zip). / Скачай и распакуй Vencord.
 4. Download and unpack [this plugin](https://github.com/MainardT/TranslatePerChat/archive/refs/heads/main.zip). / Скачай и распакуй этот плагин.
 5. In the Vencord folder create `src/userplugins/translatePerChat` and put the plugin files in it (`index.tsx`, `settings.tsx` ... must lie directly inside). / В папке Vencord создай `src/userplugins/translatePerChat` и положи туда файлы плагина (`index.tsx`, `settings.tsx` ... прямо в ней).
-6. Open PowerShell **in the Vencord root folder** (where `package.json` is, not in `src\plugins`) and run / Открой PowerShell **в корневой папке Vencord** (где лежит `package.json`, не в `src\plugins`) и выполни:
+6. Open PowerShell **in the Vencord root folder** (where `package.json` is, not in `src\plugins`) and run, one command at a time / Открой PowerShell **в корневой папке Vencord** (где лежит `package.json`, не в `src\plugins`) и выполни по одной команде:
 
 ```
 pnpm install
-pnpm build
+```
+
+```
+$env:VENCORD_HASH="local"; $env:VENCORD_REMOTE="Vendicated/Vencord"; pnpm build
+```
+
+Check that `dist/renderer.js` exists, then / Проверь, что появился файл `dist/renderer.js`, потом:
+
+```
 pnpm inject
 ```
+
+(The `$env:` line is needed because Vencord is downloaded as a zip, not through Git. Строка `$env:` нужна, потому что Vencord скачан архивом, а не через Git.)
 
 7. Fully restart Discord. / Полностью перезапусти Discord.
 8. Turn on **TranslatePerChat** in Vencord settings (and turn off the built-in **Translate**). / Включи **TranslatePerChat** в настройках Vencord (встроенный **Translate** выключи).
