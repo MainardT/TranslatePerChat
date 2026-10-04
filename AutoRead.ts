@@ -44,6 +44,50 @@ const FRESH_MS = 60_000;
 
 let lastInput = Date.now();
 const onInput = () => { lastInput = Date.now(); };
+
+/* ---------- fast scrolling ---------- */
+// While the chat is scrolled faster than the set speed (in screens per second), new translations wait; they start
+// the set time after the scrolling calms down. Messages translated before are still swapped, just not too often.
+let lastFastScroll = 0;
+let settleTimer: number | undefined;
+const scrollSamples: { t: number; dy: number; }[] = [];
+const lastTop = new WeakMap<Element, number>();
+const chatScrollers = new WeakSet<Element>();
+const SPEED_WINDOW_MS = 300;
+const isChatScroller = (el: Element) => {
+    if (chatScrollers.has(el)) return true;
+    if (el.matches('[class*="scroller"]') && el.querySelector('[data-list-id="chat-messages"]')) {
+        chatScrollers.add(el);
+        return true;
+    }
+    return false;
+};
+const settleMs = () => (settings.store.scrollSettleDelay ?? 0.4) * 1000;
+/** True while the chat is scrolled fast, and for the set time after that. */
+const scrolledFast = () => Date.now() - lastFastScroll < settleMs();
+
+const onScroll = (e: Event) => {
+    const el = e.target;
+    if (!(el instanceof Element) || !isChatScroller(el)) return;
+    const top = el.scrollTop;
+    const before = lastTop.get(el);
+    lastTop.set(el, top);
+    const now = Date.now();
+    // moves Discord makes itself (opening a chat, jumping to the bottom) are not your scrolling
+    if (before === undefined || now - lastInput > 1000) {
+        scrollSamples.length = 0;
+        return;
+    }
+    scrollSamples.push({ t: now, dy: Math.abs(top - before) });
+    while (scrollSamples.length && now - scrollSamples[0].t > SPEED_WINDOW_MS) scrollSamples.shift();
+    const perSecond = scrollSamples.reduce((sum, s) => sum + s.dy, 0) / (SPEED_WINDOW_MS / 1000);
+    if (perSecond <= (settings.store.fastScrollScreens ?? 1) * el.clientHeight) return;
+
+    lastFastScroll = now;
+    // one look at the screen when it has calmed down
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => void check(), settleMs() + 50);
+};
 /** When Discord was minimized (0 = it is not). */
 let hiddenSince = document.hidden ? Date.now() : 0;
 /** Paused: minimized for longer than the set time, or no mouse or keyboard for the set time. */
@@ -163,6 +207,8 @@ async function check(fast = false) {
     // the translator is resting after a failure: not asked until the pause is over
     if (translatorBlocked()) return;
     if ((fast ? fastBusy : busy) || paused()) return;
+    // scrolling fast (or just stopped): new translations wait
+    if (!fast && scrolledFast()) return;
     // nothing to do when no chat translates itself and in none of them your messages are translated
     if (!Object.keys(settings.store.autoReadChats).length
         && !Object.values(settings.store.channelOverrides).includes("on")
@@ -274,11 +320,14 @@ const isRow = (n: Node) => n.nodeType === 1 && ((n as Element).matches('li[id^="
 const onDrawn = (records: MutationRecord[]) => {
     if (frame || !Object.keys(settings.store.autoReadChats).length) return;
     if (!records.some(r => [...r.addedNodes].some(isRow))) return;
-    frame = requestAnimationFrame(() => { frame = 0; void check(true); });
+    // while scrolling fast the quick look is made less often
+    if (Date.now() - lastFastScroll < 400) frame = window.setTimeout(() => { frame = 0; void check(true); }, 120);
+    else frame = requestAnimationFrame(() => { frame = 0; void check(true); });
 };
 
 export function startAutoRead() {
     window.addEventListener("mousemove", onMouse, { capture: true, passive: true });
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     watcher = new MutationObserver(onDrawn);
     watcher.observe(document.body, { childList: true, subtree: true });
     setResetAllowed(() => !currentChatAutoRead());
@@ -304,9 +353,12 @@ const onVisible = () => {
 
 export function stopAutoRead() {
     window.removeEventListener("mousemove", onMouse, true);
+    window.removeEventListener("scroll", onScroll, true);
+    window.clearTimeout(settleTimer);
     watcher?.disconnect();
     watcher = undefined;
     cancelAnimationFrame(frame);
+    window.clearTimeout(frame);
     frame = 0;
     for (const type of ["mousemove", "keydown", "wheel", "mousedown"]) window.removeEventListener(type, onInput, true);
     document.removeEventListener("visibilitychange", onVisible);

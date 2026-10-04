@@ -163,6 +163,24 @@ export const settings = definePluginSettings({
         stickToMarkers: true,
         hidden: true
     },
+    /** Scrolling faster than this many screens per second counts as fast (no new translations meanwhile). */
+    fastScrollScreens: {
+        type: OptionType.SLIDER,
+        description: "Fast scrolling limit (screens per second): while scrolling faster, new translations wait",
+        markers: [0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.25, 1.5, 1.75, 2],
+        default: 1,
+        stickToMarkers: true,
+        hidden: true
+    },
+    /** Seconds to wait after fast scrolling stops before translating. */
+    scrollSettleDelay: {
+        type: OptionType.SLIDER,
+        description: "Seconds to wait after fast scrolling stops before translating",
+        markers: [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2],
+        default: 0.4,
+        stickToMarkers: true,
+        hidden: true
+    },
     autoReadIdle: {
         type: OptionType.SLIDER,
         description: "Minutes without mouse or keyboard after which auto-translating pauses",

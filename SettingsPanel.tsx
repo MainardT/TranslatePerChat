@@ -432,7 +432,7 @@ function HotkeysSection() {
 /** Settings of this menu that t("resetDefaults") puts back (the translator and its keys, and the settings of single chats and servers, stay). */
 const RESET_KEYS = [
     "autoReadOwnDelay", "autoReadEnterDelay", "translationCacheSize", "sentBufferSize", "autoReadAhead", "autoReadIdle",
-    "autoReadHiddenDelay", "showAutoTranslateTooltip", "editRemember", "editBackTranslate", "imageMinTextPx",
+    "fastScrollScreens", "scrollSettleDelay", "autoReadHiddenDelay", "showAutoTranslateTooltip", "editRemember", "editBackTranslate", "imageMinTextPx",
     "screenMinFontSize", "showReplacedTips"
 ] as const;
 
@@ -467,7 +467,7 @@ function ResetAll() {
 export function FullSettings({ channelId, scrollTo }: { channelId?: string; scrollTo?: "hotkeys"; }) {
     const t = useT();
     const s = settings.use([
-        "autoReadOwnDelay", "autoReadEnterDelay", "translationCacheSize", "sentBufferSize", "autoReadAhead", "autoReadIdle", "autoReadHiddenDelay", "channelOverrides", "guildOverrides",
+        "autoReadOwnDelay", "autoReadEnterDelay", "translationCacheSize", "sentBufferSize", "autoReadAhead", "autoReadIdle", "fastScrollScreens", "scrollSettleDelay", "autoReadHiddenDelay", "channelOverrides", "guildOverrides",
         "chatLanguages", "guildLanguages", "sentOutput",
         "showAutoTranslateTooltip", "editRemember", "editBackTranslate", "imageMinTextPx", "screenMinFontSize",
         "showReplacedTips", "service", "deeplApiKey", "kagiSession"
@@ -547,6 +547,25 @@ export function FullSettings({ channelId, scrollTo }: { channelId?: string; scro
                 steps={[0, 1, 2, 3, 4, 5, 6, 7, 8, 10]}
                 unit={t("unitPcs")}
                 onChange={v => settings.store.autoReadAhead = v}
+            />
+            <Steps
+                ex={ex} id="fastScroll"
+                title={t("fastScroll")}
+                text={t("fastScrollDesc")}
+                detail={t("fastScrollMore")}
+                value={s.fastScrollScreens ?? 1}
+                steps={[0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.25, 1.5, 1.75, 2]}
+                unit={t("unitScreensSec")}
+                onChange={v => settings.store.fastScrollScreens = v}
+            />
+            <Steps
+                ex={ex} id="scrollSettle"
+                title={t("scrollSettle")}
+                text={t("scrollSettleDesc")}
+                value={s.scrollSettleDelay ?? 0.4}
+                steps={[0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2]}
+                unit={t("unitSec")}
+                onChange={v => settings.store.scrollSettleDelay = v}
             />
             <Steps
                 ex={ex} id="idle"
