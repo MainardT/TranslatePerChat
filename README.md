@@ -16,16 +16,31 @@ Personal Vencord userplugin: translation that is set up **per chat**, with a tra
 
 ## Install / Установка
 
-You need Vencord built from source. Two ways to get it:
-Нужен Vencord, собранный из исходников. Два способа получить его:
+**Links / Ссылки**
 
-- **Quick / Быстро:** [download Vencord (zip)](https://github.com/Vendicated/Vencord/archive/refs/heads/main.zip) and unpack it. Building needs [Node.js](https://nodejs.org) and pnpm. / [скачать Vencord (zip)](https://github.com/Vendicated/Vencord/archive/refs/heads/main.zip) и распаковать. Для сборки нужны [Node.js](https://nodejs.org) и pnpm.
-- **Step by step / По документации:** [official guide](https://docs.vencord.dev/installing/custom-plugins/) / [официальное руководство](https://docs.vencord.dev/installing/custom-plugins/)
+- Vencord (zip): https://github.com/Vendicated/Vencord/archive/refs/heads/main.zip
+- Vencord repository / репозиторий: https://github.com/Vendicated/Vencord
+- Official guide for custom plugins / официальное руководство: https://docs.vencord.dev/installing/custom-plugins/
+- Node.js (LTS): https://nodejs.org
+- This plugin (zip) / этот плагин (zip): https://github.com/MainardT/TranslatePerChat/archive/refs/heads/main.zip
 
-1. Copy the contents of this repository into a folder named `translatePerChat` inside `Vencord/src/userplugins/` (the files `index.tsx`, `settings.tsx` ... must lie directly in it) / Скопируй содержимое этого репозитория в папку `translatePerChat` внутри `Vencord/src/userplugins/` (файлы `index.tsx`, `settings.tsx` ... должны лежать прямо в ней)
-2. In the Vencord folder run / В папке Vencord выполни: `pnpm build`
-3. Inject and fully restart Discord / Установи Vencord в Discord и полностью перезапусти его
-4. Turn on **TranslatePerChat** in Vencord settings (and turn off the built-in **Translate**) / Включи **TranslatePerChat** в настройках Vencord (встроенный **Translate** выключи)
+**Steps / Шаги**
+
+1. Install [Node.js](https://nodejs.org) (LTS), then close and reopen PowerShell. / Установи Node.js (LTS), затем закрой и заново открой PowerShell.
+2. Install pnpm / Установи pnpm: `npm install -g pnpm`
+3. Download and unpack [Vencord](https://github.com/Vendicated/Vencord/archive/refs/heads/main.zip). / Скачай и распакуй Vencord.
+4. Download and unpack [this plugin](https://github.com/MainardT/TranslatePerChat/archive/refs/heads/main.zip). / Скачай и распакуй этот плагин.
+5. In the Vencord folder create `src/userplugins/translatePerChat` and put the plugin files in it (`index.tsx`, `settings.tsx` ... must lie directly inside). / В папке Vencord создай `src/userplugins/translatePerChat` и положи туда файлы плагина (`index.tsx`, `settings.tsx` ... прямо в ней).
+6. Open PowerShell **in the Vencord root folder** (where `package.json` is, not in `src\plugins`) and run / Открой PowerShell **в корневой папке Vencord** (где лежит `package.json`, не в `src\plugins`) и выполни:
+
+```
+pnpm install
+pnpm build
+pnpm inject
+```
+
+7. Fully restart Discord. / Полностью перезапусти Discord.
+8. Turn on **TranslatePerChat** in Vencord settings (and turn off the built-in **Translate**). / Включи **TranslatePerChat** в настройках Vencord (встроенный **Translate** выключи).
 
 Open the plugin settings for the full list of options; the button above the chat input opens the settings of the current chat.
 Полный список настроек — в настройках плагина; кнопка у поля ввода открывает настройки текущего чата.
