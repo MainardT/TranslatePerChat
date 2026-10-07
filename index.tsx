@@ -36,18 +36,26 @@ import { startImageButtons, stopImageButtons } from "./ImageButtons";
 import { startI18n, t } from "./i18n";
 import { getChatTargetLanguage, shouldAutoTranslate } from "./overrides";
 import { startPanelNotices, stopPanelNotices } from "./Notices";
-import { messageState, messageTranslation, restoreAll, toggleMessage, translateMessage } from "./PageReplace";
+import { messageState, messageTargets, messageTranslation, replaceInPlace, restoreAll, toggleMessage } from "./PageReplace";
 import { settings } from "./settings";
 import { setShouldShowTranslateEnabledTooltip, TranslateChatBarButtons, TranslateIcon } from "./TranslateIcon";
-import { handleTranslate, TranslationAccessory } from "./TranslationAccessory";
 import { getLanguages, translate } from "./utils";
+
+/**
+ * The row of a message in the chat. A forum's first post may have another channel number in its row id,
+ * and the same number can belong to more than one element, so the row that really holds the text is preferred.
+ */
+const rowOfMessage = (message: Message) => {
+    const rows = [...document.querySelectorAll<HTMLElement>(`[id^="chat-messages-"][id$="-${message.id}"]`)];
+    return rows.find(r => messageTargets(r).length > 0) ?? rows[0] ?? null;
+};
 
 const messageCtxPatch: NavContextMenuPatchCallback = (children, { message }: { message: Message; }) => {
     const group = findGroupChildrenByChildId("copy-text", children);
     if (!group) return;
 
     // a message whose text was swapped for its translation (screen translation): switch it back and forth, copy the translation
-    const row = document.getElementById(`chat-messages-${message.channel_id}-${message.id}`);
+    const row = rowOfMessage(message);
     const state = messageState(row);
     if (row && state) {
         group.splice(group.findIndex(c => c?.props?.id === "copy-text") + 1, 0,
@@ -92,14 +100,16 @@ const messageCtxPatch: NavContextMenuPatchCallback = (children, { message }: { m
 
 /**
  * Translates a message right where it is (its text is swapped for the translation).
- * If the message is not on screen, the translation is shown under it the old way.
+ * The message is found by its row in the chat or, when there is no such row (e.g. the first post of a forum), by its text.
  */
 export async function translateInPlace(message: Message, content: string) {
-    const row = document.getElementById(`chat-messages-${message.channel_id}-${message.id}`);
-    if (row && await translateMessage(row)) return;
-    if (!content) return;
-    const trans = await translate("received", content);
-    handleTranslate(message.id, trans);
+    const row = rowOfMessage(message);
+    let targets = row ? messageTargets(row) : [];
+    // no row with the text: the text of the message itself, wherever it is on the page
+    if (!targets.length) targets = [...document.querySelectorAll(`[id="message-content-${message.id}"]`)];
+    const done = targets.length > 0 && await replaceInPlace(targets);
+    if (done) return;
+    notify(t("nothingToTranslate"), "info");
 }
 
 function getMessageContent(message: Message) {
@@ -166,7 +176,6 @@ export default definePlugin({
 
     renderMessageAccessory: props => (
         <>
-            <TranslationAccessory message={props.message} />
             <MessageButtons message={props.message} />
             <FileTranslateButtons message={props.message} />
         </>
