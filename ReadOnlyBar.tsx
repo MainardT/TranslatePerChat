@@ -83,6 +83,24 @@ function remove() {
     shownFor = "";
 }
 
+/**
+ * Looks along the middle of the bar, from its right end to its middle, for buttons of the page lying on it
+ * (not ours, not the ones in the messages) and gives the left edge of the leftmost one (or the right end of the bar if there is none).
+ */
+function leftOfOtherButtons(bar: DOMRect): number {
+    let left = bar.right;
+    const y = bar.top + bar.height / 2;
+    const middle = bar.left + bar.width / 2;
+    for (let x = bar.right - 6; x > middle; x -= 12) {
+        for (const el of document.elementsFromPoint(x, y)) {
+            const button = el.closest('button, [role="button"]');
+            if (!button || host?.contains(button) || button.closest('[data-list-id="chat-messages"]')) continue;
+            left = Math.min(left, button.getBoundingClientRect().left);
+        }
+    }
+    return left;
+}
+
 function check() {
     const channelId = SelectedChannelStore.getChannelId();
     const bar = chatBar();
@@ -106,7 +124,9 @@ function check() {
     }
 
     const r = bar.getBoundingClientRect();
-    host.style.right = `${Math.round(window.innerWidth - r.right + 12)}px`;
+    // other buttons lying on the right end of the bar (e.g. "Follow" in a forum post): our buttons stand left of them
+    const gap = Math.max(12, r.right - leftOfOtherButtons(r) + 8);
+    host.style.right = `${Math.round(window.innerWidth - r.right + gap)}px`;
     host.style.top = `${Math.round(r.top + r.height / 2)}px`;
 }
 

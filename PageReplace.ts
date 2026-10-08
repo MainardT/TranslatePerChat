@@ -971,6 +971,9 @@ function ownTextsFor(el: Element, pieces: Text[][]): string[] | null {
 
     const parts = originalPieces(mine);
     if (parts.length === pieces.length) return parts.map(p => p.trim());
+    // a list or several lines: every line goes to its own piece (Discord draws the list marks itself, so "- " is cut off)
+    const lines = parts.flatMap(p => p.split("\n")).map(l => l.replace(/^\s*(?:[-*\u2022]|\d+[.)]|#{1,3})\s+/, "").trim()).filter(Boolean);
+    if (lines.length === pieces.length) return lines;
     return pieces.map((_, i) => i === 0 ? withoutEmoji(mine).trim() : "");
 }
 

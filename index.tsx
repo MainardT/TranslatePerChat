@@ -37,7 +37,7 @@ import { startI18n, t } from "./i18n";
 import { getChatTargetLanguage, shouldAutoTranslate } from "./overrides";
 import { startPanelNotices, stopPanelNotices } from "./Notices";
 import { messageState, messageTargets, messageTranslation, replaceInPlace, restoreAll, toggleMessage } from "./PageReplace";
-import { settings } from "./settings";
+import { resetLanguageDefaults, settings } from "./settings";
 import { setShouldShowTranslateEnabledTooltip, TranslateChatBarButtons, TranslateIcon } from "./TranslateIcon";
 import { getLanguages, translate } from "./utils";
 
@@ -152,6 +152,11 @@ export default definePlugin({
     translate,
 
     start() {
+        // a translator that no longer exists (an earlier test version had one): back to Google
+        if (!["google", "deepl", "deepl-pro", "kagi"].includes(settings.store.service as string)) {
+            settings.store.service = "google";
+            resetLanguageDefaults();
+        }
         applyDiscordLanguage();
         startI18n();
         startPanelNotices();
