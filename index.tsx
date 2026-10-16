@@ -29,7 +29,7 @@ import { FileTranslateButtons, startFilePicks, stopFilePicks } from "./FileTrans
 import { CopyIcon, MessageButtons, SwapIcon } from "./MessageButtons";
 import { startAutoRead, stopAutoRead } from "./AutoRead";
 import { startReadOnlyBar, stopReadOnlyBar } from "./ReadOnlyBar";
-import { translateKeepingEmoticons } from "./Emoticons";
+import { translateFormatted } from "./Markdown";
 import { noteSent, onBeforeEdit, startEditOriginals, stopEditOriginals } from "./EditOriginals";
 import { startHotkeys, stopHotkeys } from "./Hotkeys";
 import { startImageButtons, stopImageButtons } from "./ImageButtons";
@@ -200,8 +200,8 @@ export default definePlugin({
         tooltipTimeout = setTimeout(() => setShouldShowTranslateEnabledTooltip?.(false), 2000);
 
         const original = message.content;
-        // smileys like "=)" stay as written, so Discord turns them into emoji by its own rules
-        const trans = await translateKeepingEmoticons("sent", original, false, getChatTargetLanguage(channelId));
+        // formatting, lines, code, links, emoji and smileys like "=)" stay as written
+        const trans = await translateFormatted("sent", original, false, getChatTargetLanguage(channelId));
         message.content = trans.text;
         noteSent(channelId, original, trans.text);
     },

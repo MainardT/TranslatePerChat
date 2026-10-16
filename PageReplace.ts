@@ -974,7 +974,12 @@ function ownTextsFor(el: Element, pieces: Text[][]): string[] | null {
     // a list or several lines: every line goes to its own piece (Discord draws the list marks itself, so "- " is cut off)
     const lines = parts.flatMap(p => p.split("\n")).map(l => l.replace(/^\s*(?:[-*\u2022]|\d+[.)]|#{1,3})\s+/, "").trim()).filter(Boolean);
     if (lines.length === pieces.length) return lines;
-    return pieces.map((_, i) => i === 0 ? withoutEmoji(mine).trim() : "");
+    // more lines than the chat has (the translator glued lines together in an older message): one line per piece,
+    // the extra ones go into the last piece, so no list point stays empty
+    if (lines.length > pieces.length && pieces.length > 1)
+        return [...lines.slice(0, pieces.length - 1), lines.slice(pieces.length - 1).join("\n")];
+    if (pieces.length > 1) return null; // fewer lines than the chat has: the translator is asked
+    return [withoutEmoji(mine).trim()];
 }
 
 /** The new text of every text node of a piece when your own text is put in (the first node holds it all, the spaces around stay). */

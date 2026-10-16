@@ -29,8 +29,9 @@
 import * as DataStore from "@api/DataStore";
 import { FluxDispatcher, MessageStore, UserStore } from "@webpack/common";
 
+import { attachFormatBar, formatHotkey } from "./FormatBar";
 import { notify } from "./Notify";
-import { translateKeepingEmoticons } from "./Emoticons";
+import { translateFormatted } from "./Markdown";
 import { getChatTargetLanguage, shouldAutoTranslate } from "./overrides";
 import { settings } from "./settings";
 import { cl } from "./utils";
@@ -241,7 +242,7 @@ function interceptor(action: any): boolean {
     void (async () => {
         let text = content;
         try {
-            const back = (await translateKeepingEmoticons("sent", content, true, ownLanguage())).text;
+            const back = (await translateFormatted("sent", content, true, ownLanguage())).text;
             if (back && !same(back, content)) {
                 text = back;
                 startSession({ ...action }, back, content);
@@ -270,7 +271,7 @@ export async function onBeforeEdit(channelId: string, messageId: string, message
         let sent: string;
         if (s.lowerEdited && s.lowerText.trim()) sent = s.lowerText;
         else if (alike(mine, s.cache.from)) sent = s.cache.to;
-        else sent = (await translateKeepingEmoticons("sent", mine, false, getChatTargetLanguage(channelId))).text;
+        else sent = (await translateFormatted("sent", mine, false, getChatTargetLanguage(channelId))).text;
 
         messageObj.content = sent;
         // your text stays remembered as you wrote it, whatever was typed into the translation
@@ -292,6 +293,8 @@ interface Twin {
     again: HTMLButtonElement;
     /** The caption above the edit field ("Оригинальный текст сообщения"). */
     caption: HTMLElement;
+    /** Takes the formatting bar off the box. */
+    detachBar(): void;
 }
 
 /** How long after you stop typing the translation is made. */
@@ -395,6 +398,11 @@ function makeTwin(s: EditSession): Twin {
     area.addEventListener("keydown", e => {
         e.stopPropagation();
         if (e.isComposing) return;
+        // Discord's formatting keys (Ctrl+B, Ctrl+I...), and Esc closes the formatting bar first
+        if (formatHotkey(e, area)) {
+            e.preventDefault();
+            return;
+        }
         if (e.key === "Escape") {
             e.preventDefault();
             FluxDispatcher.dispatch({ type: "MESSAGE_END_EDIT", channelId: s.channelId, messageId: s.messageId });
@@ -416,10 +424,12 @@ function makeTwin(s: EditSession): Twin {
     caption.textContent = t("editUpperLabel");
 
     requestAnimationFrame(() => fit(area));
-    return { root, area, again, caption };
+    const detachBar = attachFormatBar(area);
+    return { root, area, again, caption, detachBar };
 }
 
 function dropTwin(s: EditSession) {
+    s.twin?.detachBar();
     s.twin?.caption.remove();
     s.twin?.root.remove();
     s.twin = undefined;
@@ -473,7 +483,7 @@ async function refreshTwin(s: EditSession, force = false) {
     } else {
         s.twin?.root.classList.add(cl("twin-busy"));
         try {
-            to = (await translateKeepingEmoticons("sent", mine, false, getChatTargetLanguage(s.channelId))).text;
+            to = (await translateFormatted("sent", mine, false, getChatTargetLanguage(s.channelId))).text;
         } catch (e) {
             console.error("[TranslatePerChat] translating the edit failed", e);
             notify(t("editFailText"), "error");
