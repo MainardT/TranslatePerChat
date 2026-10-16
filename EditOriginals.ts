@@ -140,12 +140,10 @@ export const originalPieces = (s: string) => s.split(EMOJI).filter(hasLetters);
 /** All of your text without the emoji (they stay in the chat as they are). */
 export const withoutEmoji = (s: string) => s.replace(EMOJI, "");
 
-/** Links, mentions, timestamps and formatting stay in the chat as separate things: text with them is left to the translator. */
-const KEPT_APART = /https?:\/\/|<[@#]|<t:\d|[*_~|]{2}|`|^\s*(>|#{1,3}\s)/m;
 
 /**
  * Your own text for one of your messages that was translated before sending and is remembered, found by the message number.
- * Null when it is not remembered, was changed since (on another device), or has links / formatting: the translator is asked then.
+ * Null when it is not remembered or was changed since (on another device): the translator is asked then.
  */
 export function originalFor(channelId: string, messageId: string, quiet = false): string | null {
     const entry = saved.get(messageId);
@@ -153,9 +151,6 @@ export function originalFor(channelId: string, messageId: string, quiet = false)
 
     const message: any = MessageStore.getMessage(channelId, messageId);
     if (!message || !alike(entry.t, message.content ?? "")) {
-        return null;
-    }
-    if (KEPT_APART.test(entry.o)) {
         return null;
     }
     return entry.o;

@@ -24,7 +24,7 @@
  */
 
 import { HOTKEYS, HotkeyAction, hotkeyLabel } from "./HotkeyConfig";
-import { originalFor, originalPieces, withoutEmoji } from "./EditOriginals";
+import { originalFor } from "./EditOriginals";
 import { isOnlyEmoticons, protectEmoticons } from "./Emoticons";
 import { translateFileText, runLimited } from "./FileTranslate";
 import { t, TextKey } from "./i18n";
@@ -838,6 +838,8 @@ const LINE = /\u27E6\s*0\s*\u27E7/g;
 const PAIR = /\u27E6\s*(\d+)\s*\u27E7([\s\S]*?)\u27E6\s*\1\s*\u27E7/g;
 const ANY_MARK = /\u27E6\s*\d+\s*\u27E7/g;
 const HAS_MARK = /\u27E6\s*\d+\s*\u27E7/;
+/** A mark with its number. */
+const MARK_NUM = /\u27E6\s*(\d+)\s*\u27E7/g;
 
 function segmentsOf(nodes: Text[]): Segment[] {
     const segs: Segment[] = [];
@@ -856,17 +858,29 @@ function segmentsOf(nodes: Text[]): Segment[] {
     return segs;
 }
 
+/** A piece of text made ready for the translator: formatting and line breaks as marks, smileys hidden. */
+interface Prepared {
+    nodes: Text[];
+    segs: Segment[];
+    styled: Segment[];
+    built: string;
+    lines: number;
+    smileys: ReturnType<typeof protectEmoticons>;
+    lead: string;
+    trail: string;
+}
+
 /**
- * Translates one piece of text, keeping what is inside links and formatting where it was:
- * the formatted words are wrapped in marks "⟦1⟧...⟦1⟧", the translator keeps the marks, and each part goes back
- * into its own element. Smileys are hidden from the translator. Returns the new text of every node, or null.
+ * Wraps the formatted words of a piece in marks "⟦1⟧...⟦1⟧" (the translator keeps the marks, and each part goes back
+ * into its own element), turns single line breaks into marks ⟦0⟧ and hides the smileys.
  */
-async function translateNodes(nodes: Text[], skipUnchanged?: boolean, track?: { fresh: boolean; }): Promise<string[] | null> {
+function preparePiece(nodes: Text[]): Prepared {
     const segs = segmentsOf(nodes);
-    // the plain text is the element holding most of the letters; everything else is formatting
+    // the plain text is the outermost element (the one the formatting sits in), then the one holding most of the letters
     const weight = new Map<Element | null, number>();
     for (const s of segs) weight.set(s.owner, (weight.get(s.owner) ?? 0) + s.core.length);
-    const plainOwner = [...weight].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const depth = (e: Element | null) => { let d = 0; for (let x = e; x; x = x.parentElement) d++; return d; };
+    const plainOwner = [...weight].sort((a, b) => depth(a[0]) - depth(b[0]) || b[1] - a[1])[0]?.[0] ?? null;
     const styled = segs.length > 1 ? segs.filter(s => s.owner !== plainOwner && s.core) : [];
 
     let built = segs.map(s => {
@@ -881,19 +895,18 @@ async function translateNodes(nodes: Text[], skipUnchanged?: boolean, track?: { 
     const smileys = protectEmoticons(built.trim());
     // single line breaks become marks (empty lines between paragraphs stay: those are translated one by one)
     built = smileys.text.replace(/ *(?<!\n)\n(?!\n) */g, ` ${MARK(0)} `);
-    const lines = (built.match(LINE) ?? []).length;
-    let translated = await translatePiece(built, track);
-    if (translated === null) return null;
-    if ((translated.match(LINE) ?? []).length !== lines) {
-        // the translator lost line breaks: line by line instead
-        const parts = await Promise.all(built.split(LINE).map(line => line.trim() ? translatePiece(line.trim(), track) : Promise.resolve("")));
-        if (parts.some(p => p === null)) return null;
-        translated = parts.join("\n");
-    } else {
-        translated = translated.replace(/[ \t]*\u27E6\s*0\s*\u27E7[ \t]*/g, "\n");
-    }
-    if (skipUnchanged && sameText(translated.replace(ANY_MARK, ""), built.replace(ANY_MARK, ""))) return null;
-    translated = smileys.restore(translated);
+    return { nodes, segs, styled, built, lines: (built.match(LINE) ?? []).length, smileys, lead, trail };
+}
+
+/**
+ * Puts a translation (written with the marks of the piece) into the text nodes of the piece.
+ * Null when it is the same text (with skipUnchanged). "own": your own text from the memory (no smileys to put back).
+ */
+function finishPiece(p: Prepared, translated: string, skipUnchanged?: boolean, own = false): string[] | null {
+    const { nodes, segs, styled, lead, trail } = p;
+    translated = translated.replace(/[ \t]*⟦\s*0\s*⟧[ \t]*/g, "\n");
+    if (skipUnchanged && !own && sameText(translated.replace(ANY_MARK, ""), p.built.replace(ANY_MARK, ""))) return null;
+    if (!own) translated = p.smileys.restore(translated);
 
     const texts = nodes.map(() => "");
     const put = (seg: Segment, text: string) => {
@@ -919,10 +932,10 @@ async function translateNodes(nodes: Text[], skipUnchanged?: boolean, track?: { 
         last = m.index! + m[0].length;
     }
     plainParts.push(translated.slice(last));
-    if (ok && chunks.size === styled.length && !plainParts.some(p => HAS_MARK.test(p))) {
+    if (ok && chunks.size === styled.length && !plainParts.some(x => HAS_MARK.test(x))) {
         styled.forEach((s, k) => put(s, chunks.get(k + 1)!.replace(ANY_MARK, "")));
         const plain = segs.filter(s => !styled.includes(s));
-        const parts = plainParts.map(p => p.trim()).filter(Boolean);
+        const parts = plainParts.map(x => x.trim()).filter(Boolean);
         if (plain.length) {
             plain.forEach((s, k) => {
                 const mine = k < plain.length - 1 ? parts.slice(k, k + 1) : parts.slice(k);
@@ -945,41 +958,214 @@ async function translateNodes(nodes: Text[], skipUnchanged?: boolean, track?: { 
     return texts;
 }
 
-/** Whether a piece of text has formatting inside it (bold, a spoiler...): such text is not rebuilt from memory. */
-function hasStyledParts(nodes: Text[]): boolean {
-    const segs = segmentsOf(nodes);
-    if (segs.length < 2) return false;
-    const weight = new Map<Element | null, number>();
-    for (const s of segs) weight.set(s.owner, (weight.get(s.owner) ?? 0) + s.core.length);
-    const plainOwner = [...weight].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-    return segs.some(s => s.owner !== plainOwner && s.core);
+/** Translates one piece of text on its own, keeping links, formatting and smileys. Returns the new text of every node, or null. */
+async function translateNodes(nodes: Text[], skipUnchanged?: boolean, track?: { fresh: boolean; }): Promise<string[] | null> {
+    const p = preparePiece(nodes);
+    let translated = await translatePiece(p.built, track);
+    if (translated === null) return null;
+    if ((translated.match(LINE) ?? []).length !== p.lines) {
+        // the translator lost line breaks: line by line instead
+        const parts = await Promise.all(p.built.split(LINE).map(line => line.trim() ? translatePiece(line.trim(), track) : Promise.resolve("")));
+        if (parts.some(x => x === null)) return null;
+        translated = parts.join("\n");
+    }
+    return finishPiece(p, translated, skipUnchanged);
+}
+
+/* ---------- a whole message at once ---------- */
+
+/** How often a message is translated whole, and how often piece by piece because marks were lost. */
+const wholeStats = { whole: 0, pieces: 0 };
+
+/**
+ * All pieces of one message translated together, so the translator sees whole sentences: what stands between the pieces
+ * (links, mentions, emoji, the borders of lines and list points) becomes a mark, and every piece gets its part back.
+ * Null when the translator lost, doubled or moved a mark: the caller translates piece by piece then.
+ */
+async function translateWhole(pieces: Text[][], skipUnchanged: boolean | undefined, track: { fresh: boolean; }): Promise<(string[] | null)[] | null> {
+    const prepared = pieces.map(preparePiece);
+    // the marks of every piece get numbers of their own in the whole text
+    let next = 1;
+    const owner = new Map<number, { piece: number; local: number; }>();
+    const expected = new Map<number, number>();
+    const borders: number[] = [];
+    let text = "";
+    let lineCount = 0;
+    prepared.forEach((p, i) => {
+        const local = new Map<number, number>();
+        const body = p.built.replace(MARK_NUM, (m, n: string) => {
+            const id = Number(n);
+            if (id === 0) return m;
+            let g = local.get(id);
+            if (g === undefined) {
+                g = next++;
+                local.set(id, g);
+                owner.set(g, { piece: i, local: id });
+            }
+            expected.set(g, (expected.get(g) ?? 0) + 1);
+            return MARK(g);
+        });
+        lineCount += p.lines;
+        if (i > 0) {
+            const g = next++;
+            borders.push(g);
+            expected.set(g, 1);
+            text += ` ${MARK(g)} `;
+        }
+        text += body;
+    });
+    if (text.length > LONG_PIECE) return null;
+
+    const translated = await translatePiece(text, track);
+    if (translated === null) return null;
+
+    // every mark exactly as often as it was sent
+    const counts = new Map<number, number>();
+    let lines = 0;
+    for (const m of translated.matchAll(MARK_NUM)) {
+        const id = Number(m[1]);
+        if (id === 0) lines++;
+        else counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+    if (lines !== lineCount || counts.size !== expected.size || [...expected].some(([g, n]) => counts.get(g) !== n)) return null;
+
+    // the borders in their order: each piece's part lies between two of them
+    const parts: string[] = [];
+    let last = 0;
+    let k = 0;
+    for (const m of translated.matchAll(MARK_NUM)) {
+        const id = Number(m[1]);
+        if (!borders.includes(id)) continue;
+        if (id !== borders[k]) return null;
+        parts.push(translated.slice(last, m.index));
+        last = m.index! + m[0].length;
+        k++;
+    }
+    parts.push(translated.slice(last));
+
+    const out: (string[] | null)[] = [];
+    for (let i = 0; i < prepared.length; i++) {
+        let bad = false;
+        // back to the piece's own mark numbers; a mark of another piece here means it moved
+        const part = parts[i].replace(MARK_NUM, (m, n: string) => {
+            const id = Number(n);
+            if (id === 0) return m;
+            const o = owner.get(id);
+            if (!o || o.piece !== i) bad = true;
+            return o ? MARK(o.local) : m;
+        });
+        if (bad || (part.match(LINE) ?? []).length !== prepared[i].lines) return null;
+        out.push(finishPiece(prepared[i], part.trim(), skipUnchanged));
+    }
+    return out;
+}
+
+/* ---------- your own messages: your text from the memory ---------- */
+
+/** Things the chat shows as separate elements between the pieces of text: the text is cut at them. */
+const OWN_APART = /(`+)(?!`)[\s\S]+?\1|<a?:\w+:\d+>|<(?:@[!&]?|#)\d+>|<\/[\w -]+:\d+>|<t:-?\d+(?::[tTdDfFR])?>|<id:\w+>|<?https?:\/\/[^\s<>]+>?|@(?:everyone|here)\b|\p{Extended_Pictographic}(?:[️‍\u{1F3FB}-\u{1F3FF}]|\p{Extended_Pictographic})*|\p{Regional_Indicator}{2}/gu;
+/** Start of a line: quotes, headings, small text, list marks (Discord draws them itself). */
+const OWN_LINE_START = /^\s*(?:>>> |> |#{1,3} |-# |[-*+] |\d{1,3}[.)] )*/;
+/** Formatting around words, longer marks first. */
+const OWN_PAIRS = [
+    /\|\|([\s\S]+?)\|\|/g, /~~([\s\S]+?)~~/g, /\*\*\*([\s\S]+?)\*\*\*/g, /\*\*([\s\S]+?)\*\*/g, /__([\s\S]+?)__/g,
+    /(?<![*\w\\])\*(?![\s*])([^\n*]+?)(?<![\s\\])\*(?![*\w])/g, /(?<![\w\\])_(?![\s_])([^\n_]+?)(?<![\s\\])_(?![\w])/g
+];
+const CUT = "\u0000";
+
+/**
+ * Your text cut the way the chat cuts the message: at links, mentions, emoji and code, and into list points and headings.
+ * Formatting becomes marks "⟦1⟧...⟦1⟧" (numbered from 1 in every piece), as the translator would give them.
+ * Null when the pieces cannot be matched with the chat.
+ */
+function ownChunks(mine: string, count: number): string[] | null {
+    if (mine.includes("```")) return null;
+    let pairId = 1;
+    const pair = (_: string, inner: string) => {
+        const id = pairId++;
+        return `${MARK(id)}${inner}${MARK(id)}`;
+    };
+    // [words](link): the words are shown as a link
+    let text = mine.replace(/\[([^\]\n]+)\]\((<?https?:\/\/[^)\s]+>?)\)/g, pair);
+    text = text.replace(OWN_APART, CUT);
+
+    // lines: list points, headings and small text are blocks of their own; plain lines and quotes run on
+    const blocks: string[] = [];
+    let current: string[] = [];
+    let kind = "";
+    let quoteRest = false;
+    const flush = () => {
+        if (current.length) blocks.push(current.join("\n"));
+        current = [];
+    };
+    for (const line of text.split("\n")) {
+        const start = quoteRest ? "" : line.match(OWN_LINE_START)![0];
+        const body = line.slice(start.length);
+        if (start.includes(">>> ")) quoteRest = true;
+        const k = quoteRest ? "quote" : /[-*+]\s|\d[.)]\s|#/.test(start) ? "own" : start.includes(">") ? "quote" : "plain";
+        if (k === "own" || k !== kind) flush();
+        current.push(body);
+        kind = k;
+    }
+    flush();
+
+    let chunks = blocks.flatMap(b => {
+        let s = b;
+        for (const re of OWN_PAIRS) s = s.replace(re, pair);
+        return s.replace(/\\([\\*_~|`>#\-[\]()])/g, "$1").split(CUT);
+    }).filter(c => {
+        const bare = c.replace(ANY_MARK, "");
+        return hasText(bare) && !isOnlyEmoticons(bare);
+    });
+
+    // more pieces than the chat has (the translator glued lines together in an older message): the rest go into the last one
+    if (chunks.length > count && count > 1 && !chunks.some(c => HAS_MARK.test(c)))
+        chunks = [...chunks.slice(0, count - 1), chunks.slice(count - 1).join("\n")];
+    if (chunks.length > count && count === 1) chunks = [chunks.join("\n")];
+    if (chunks.length !== count) return null;
+
+    // the marks of every piece numbered 1, 2, 3... in their order
+    return chunks.map(c => {
+        const local = new Map<string, number>();
+        return c.replace(MARK_NUM, (_, n: string) => {
+            if (!local.has(n)) local.set(n, local.size + 1);
+            return MARK(local.get(n)!);
+        }).trim();
+    });
 }
 
 /**
- * Your own text for the pieces of one of your messages (found by the message number, not by guessing from the text),
- * or null when the message is not remembered / has links or formatting (the translator is asked then).
- * Pieces that do not line up with the pieces of the chat: all the text goes to the first one, the rest are emptied (emoji stay).
+ * Your own text for the pieces of one of your messages (found by the message number, not by guessing from the text):
+ * the new text of every node of every piece, with formatting put back into its elements.
+ * Null when the message is not remembered or its pieces do not line up with the chat (the translator is asked then).
  */
-function ownTextsFor(el: Element, pieces: Text[][]): string[] | null {
+function ownTextsFor(el: Element, pieces: Text[][]): string[][] | null {
     if (!el.id.startsWith("message-content-")) return null;
     const messageId = el.id.slice("message-content-".length);
     const channelId = el.closest('[id^="chat-messages-"]')?.id.match(/^chat-messages-(\d+)-/)?.[1];
-    if (!channelId || pieces.some(hasStyledParts)) return null;
+    if (!channelId) return null;
 
     const mine = originalFor(channelId, messageId);
     if (mine === null) return null;
+    const chunks = ownChunks(mine, pieces.length);
+    if (!chunks) {
+        return null;
+    }
 
-    const parts = originalPieces(mine);
-    if (parts.length === pieces.length) return parts.map(p => p.trim());
-    // a list or several lines: every line goes to its own piece (Discord draws the list marks itself, so "- " is cut off)
-    const lines = parts.flatMap(p => p.split("\n")).map(l => l.replace(/^\s*(?:[-*\u2022]|\d+[.)]|#{1,3})\s+/, "").trim()).filter(Boolean);
-    if (lines.length === pieces.length) return lines;
-    // more lines than the chat has (the translator glued lines together in an older message): one line per piece,
-    // the extra ones go into the last piece, so no list point stays empty
-    if (lines.length > pieces.length && pieces.length > 1)
-        return [...lines.slice(0, pieces.length - 1), lines.slice(pieces.length - 1).join("\n")];
-    if (pieces.length > 1) return null; // fewer lines than the chat has: the translator is asked
-    return [withoutEmoji(mine).trim()];
+    const out: string[][] = [];
+    for (let i = 0; i < pieces.length; i++) {
+        const p = preparePiece(pieces[i]);
+        const marks = new Set([...chunks[i].matchAll(MARK_NUM)].map(m => m[1])).size;
+        if (!p.styled.length) {
+            out.push(ownNodeTexts(pieces[i], chunks[i].replace(ANY_MARK, "").trim()));
+            continue;
+        }
+        if (marks !== p.styled.length) {
+            return null;
+        }
+        out.push(finishPiece(p, chunks[i], false, true)!);
+    }
+    return out;
 }
 
 /** The new text of every text node of a piece when your own text is put in (the first node holds it all, the spaces around stay). */
@@ -1006,26 +1192,36 @@ export async function replaceInPlace(targets: Element[], options: { skipUnchange
         if (pieces.length) jobs.push({ el, pieces });
     }
 
-    const all = jobs.flatMap(job => job.pieces.map(nodes => ({ job, nodes })));
-    // already in your alphabet: not even sent to the translator
-    const toAsk = options.skipUnchanged
-        ? all.filter(({ nodes }) => !inReadingAlphabet(nodes.map(n => n.nodeValue ?? "").join("")))
-        : all;
+    type Result = { nodes: Text[]; texts: string[]; fresh: boolean; } | null;
+    // one task per message: your own text, or the whole message for the translator
+    const tasks = jobs.map(job => async (): Promise<Result[]> => {
+        // your own messages that are remembered: your text, by the message number
+        const own = ownTextsFor(job.el, job.pieces);
+        if (own) return job.pieces.map((nodes, i) => ({ nodes, texts: own[i], fresh: false }));
 
+        // already in your alphabet: not even sent to the translator
+        const toAsk = options.skipUnchanged
+            ? job.pieces.filter(nodes => !inReadingAlphabet(nodes.map(n => n.nodeValue ?? "").join("")))
+            : job.pieces;
+        if (!toAsk.length) return [];
 
-    // your own messages that are remembered: your text, by the message number
-    const own = new Map<Text[], string>();
-    for (const job of jobs) ownTextsFor(job.el, job.pieces)?.forEach((text, i) => own.set(job.pieces[i], text));
-
-    const results = await runLimited(toAsk, PARALLEL_REQUESTS, async ({ nodes }) => {
-        const mine = own.get(nodes);
-        if (mine !== undefined) return { nodes, texts: ownNodeTexts(nodes, mine), fresh: false };
-        // already in the language you read (the translator gave the same text back): left alone
-        const track = { fresh: false };
-        const texts = await translateNodes(nodes, options.skipUnchanged, track);
-        return texts ? { nodes, texts, fresh: track.fresh } : null;
+        if (toAsk.length > 1) {
+            const track = { fresh: false };
+            const whole = await translateWhole(toAsk, options.skipUnchanged, track);
+            if (whole) {
+                wholeStats.whole++;
+                return toAsk.map((nodes, i) => whole[i] ? { nodes, texts: whole[i]!, fresh: track.fresh } : null);
+            }
+            wholeStats.pieces++;
+        }
+        // piece by piece; already in the language you read (the translator gave the same text back): left alone
+        return Promise.all(toAsk.map(async nodes => {
+            const track = { fresh: false };
+            const texts = await translateNodes(nodes, options.skipUnchanged, track);
+            return texts ? { nodes, texts, fresh: track.fresh } : null;
+        }));
     });
-
+    const results = (await runLimited(tasks, PARALLEL_REQUESTS, task => task())).flat();
 
     let anything = targets.some(el => replaced.has(el));
     for (const job of jobs) {
